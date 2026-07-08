@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil ve Ayarlar | Yönetim Paneli</title>
+    <!-- Tailwind CSS ve FontAwesome CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased hidden" id="profileBody">
+
+    <!-- Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="text-slate-500 hover:text-slate-900 transition"><i class="fa-solid fa-arrow-left text-lg"></i></a>
+                <span class="font-bold text-lg text-slate-900 tracking-tight">Profil & Şirket Ayarları</span>
+            </div>
+            <span id="userEmailLabel" class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">...</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+
+        <!-- Loading State -->
+        <div id="pageLoading" class="text-center py-20">
+            <i class="fa-solid fa-circle-notch animate-spin text-slate-950 text-2xl mb-3"></i>
+            <p class="text-slate-400 text-xs">Ayarlar yükleniyor, lütfen bekleyin...</p>
+        </div>
+
+        <div id="settingsContainer" class="flex flex-col gap-8 hidden">
+            
+            <!-- 1. KİŞİSEL PROFİL AYARLARI -->
+            <form id="agentForm" onsubmit="handleAgentUpdate(event)" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col gap-6">
+                <h2 class="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-user-tie text-slate-500"></i> Kişisel Profil Bilgileri
+                </h2>
+
+                <div class="flex flex-col sm:flex-row items-center gap-6">
+                    <!-- Profil Fotoğrafı Gösterimi ve Seçimi -->
+                        <div id="agentAvatarContainer" class="relative w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 flex-shrink-0 flex items-center justify-center">
+        <img id="imgAgentAvatar" src="" class="w-full h-full object-cover hidden">
+        <span id="agentInitials" class="font-bold text-3xl text-slate-400">...</span>
+    </div>
+                    <div class="flex-1 w-full">
+                        <label class="block text-xs font-bold text-slate-700 mb-2">Profil Fotoğrafını Değiştir</label>
+                        <input type="file" id="inpAgentAvatar" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800 cursor-pointer">
+                        <p class="text-[10px] text-slate-400 mt-1.5">Müşteri detay sayfasında isminizin yanında görüntülenecektir.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-500 uppercase tracking-wider mb-2">Adınız Soyadınız</label>
+                        <input type="text" id="inpAgentName" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-900 focus:bg-white focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-500 uppercase tracking-wider mb-2">Telefon Numaranız</label>
+                        <input type="text" id="inpAgentPhone" required placeholder="Örn: 905398231656" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-900 focus:bg-white focus:outline-none transition">
+                        <p class="text-[10px] text-slate-400 mt-1">Lütfen başına "+" veya boşluk koymadan ülke koduyla yazın.</p>
+                    </div>
+                </div>
+
+                <button type="submit" id="btnSaveAgent" class="self-end px-6 py-3 bg-slate-950 text-white font-bold rounded-xl text-xs tracking-wider uppercase hover:bg-slate-800 transition duration-150 flex items-center gap-2">
+                    <span id="txtSaveAgent">Profil Bilgilerini Güncelle</span>
+                    <i id="iconSaveAgent" class="fa-solid fa-circle-check"></i>
+                </button>
+            </form>
+
+            <!-- 2. ŞİRKET LOGO VE İSİM AYARLARI -->
+            <form id="companyForm" onsubmit="handleCompanyUpdate(event)" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col gap-6">
+                <h2 class="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-building text-slate-500"></i> Şirket & Marka Ayarları
+                </h2>
+
+                <div class="flex flex-col sm:flex-row items-center gap-6">
+                    <!-- Şirket Logosu Gösterimi ve Seçimi -->
+                    <div class="relative w-32 h-16 rounded-xl overflow-hidden bg-slate-50 border border-slate-200 flex-shrink-0 flex items-center justify-center p-2">
+                        <img id="imgCompanyLogo" src="" class="w-full h-full object-contain hidden">
+                        <i id="iconLogoPlaceholder" class="fa-solid fa-image text-3xl text-slate-300"></i>
+                    </div>
+                    <div class="flex-1 w-full">
+                        <label class="block text-xs font-bold text-slate-700 mb-2">Yeni Şirket Logosu Yükle</label>
+                        <input type="file" id="inpCompanyLogo" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800 cursor-pointer">
+                        <p class="text-[10px] text-slate-400 mt-1.5">Tüm müşteri sayfalarının üst kısmında görüntülenecek ana logodur.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-500 uppercase tracking-wider mb-2">Şirket / Marka Adı</label>
+                        <input type="text" id="inpCompanyName" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-900 focus:bg-white focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-500 uppercase tracking-wider mb-2">Şirket Adresi</label>
+                        <input type="text" id="inpCompanyAddress" placeholder="Örn: Yenişehir, Diyarbakır, Türkiye" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-900 focus:bg-white focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-500 uppercase tracking-wider mb-2">Google Harita Koordinatları (Enlem, Boylam)</label>
+                        <input type="text" id="inpCompanyCoords" placeholder="Örn: 37.930533, 40.183631" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-900 focus:bg-white focus:outline-none transition">
+                        <p class="text-[9px] text-slate-400 mt-1">İletişim sayfasındaki harita görselini otomatik oluşturmak için kullanılır.</p>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-500 uppercase tracking-wider mb-2">Google Harita Paylaşım Linki</label>
+                        <input type="text" id="inpCompanyMapLink" placeholder="Örn: https://maps.app.goo.gl/..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-900 focus:bg-white focus:outline-none transition">
+                        <p class="text-[9px] text-slate-400 mt-1">Müşterilerin haritada yol tarifi alması için kullanılır.</p>
+                    </div>
+                </div>
+
+                <button type="submit" id="btnSaveCompany" class="self-end px-6 py-3 bg-slate-950 text-white font-bold rounded-xl text-xs tracking-wider uppercase hover:bg-slate-800 transition duration-150 flex items-center gap-2">
+                    <span id="txtSaveCompany">Şirket Ayarlarını Kaydet</span>
+                    <i id="iconSaveCompany" class="fa-solid fa-cloud-arrow-up"></i>
+                </button>
+            </form>
+
+        </div>
+
+    </main>
+
+    <!-- JS Mantığı -->
+    <script>
+        const SUPABASE_URL = "https://vabkxnntjrqrvvjtdcod.supabase.co"; 
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhYmt4bm50anJxcnZ2anRkY29kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzOTYxODcsImV4cCI6MjA5ODk3MjE4N30.qIt3Y92zHAgyrLAxf2L7PnzOf3AbYlktIQ3mQKN5uPA";
+
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentAgent = null;
+        let settingsId = null;
+
+        // 1. Oturum Kontrolü
+        async function checkSession() {
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            if (error || !session) {
+                window.location.href = "login.html";
+                return;
+            }
+            document.getElementById('userEmailLabel').textContent = session.user.email;
+            document.getElementById('profileBody').classList.remove('hidden');
+
+            await loadAllSettings(session.user.email);
+        }
+
+        // 2. Verileri getirme ve formları doldurma
+        async function loadAllSettings(email) {
+            try {
+                // Danışman Bilgilerini Çek
+                const { data: agent, error: agentErr } = await supabaseClient
+                    .from('agents')
+                    .select('*')
+                    .eq('email', email)
+                    .single();
+
+                if (agentErr || !agent) throw agentErr;
+                currentAgent = agent;
+
+                document.getElementById('inpAgentName').value = agent.name;
+                document.getElementById('inpAgentPhone').value = agent.phone;
+                
+                if (agent.avatar_url) {
+                    const avatarImg = document.getElementById('companyLogo'); // Fallback identifier
+                    document.getElementById('agentInitials').classList.add('hidden');
+                    const imgEl = document.createElement('img');
+                    imgEl.src = agent.avatar_url;
+                    imgEl.className = "w-full h-full object-cover";
+                    document.getElementById('agentAvatarContainer').innerHTML = '';
+                    document.getElementById('agentAvatarContainer').appendChild(imgEl);
+                } else {
+                    document.getElementById('agentInitials').textContent = agent.name.charAt(0);
+                }
+
+                // Şirket Bilgilerini Çek (settings tablosundaki ilk satır)
+                const { data: settingsList, error: settingsErr } = await supabaseClient
+                    .from('settings')
+                    .select('*');
+
+                if (!settingsErr && settingsList && settingsList.length > 0) {
+                    const settings = settingsList[0];
+                    settingsId = settings.id;
+                                        document.getElementById('inpCompanyName').value = settings.company_name || 'Gayrimenkul Yatırım';
+                    document.getElementById('inpCompanyAddress').value = settings.company_address || '';
+                    document.getElementById('inpCompanyCoords').value = settings.map_coordinates || '';
+                    document.getElementById('inpCompanyMapLink').value = settings.map_link || '';
+
+                    if (settings.logo_url) {
+                        document.getElementById('iconLogoPlaceholder').classList.add('hidden');
+                        const logoImg = document.getElementById('imgCompanyLogo');
+                        logoImg.src = settings.logo_url;
+                        logoImg.classList.remove('hidden');
+                    }
+                }
+
+                document.getElementById('pageLoading').classList.add('hidden');
+                document.getElementById('settingsContainer').classList.remove('hidden');
+
+            } catch (err) {
+                console.error("Yükleme Hatası:", err.message);
+                alert("Veriler yüklenemedi: " + err.message);
+            }
+        }
+
+        // 3. WebP Sıkıştırma Fonksiyonu
+        async function compressToWebP(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 600; // Logolar ve avatarlar için daha küçük boyut yeterlidir
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > MAX_WIDTH) {
+                            height = Math.round((height * MAX_WIDTH) / width);
+                            width = MAX_WIDTH;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                                type: "image/webp"
+                            });
+                            resolve(compressedFile);
+                        }, "image/webp", 0.85);
+                    };
+                };
+            });
+        }
+
+        // 4. Kişisel Profil Güncelleme Süreci
+        async function handleAgentUpdate(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSaveAgent');
+            const txt = document.getElementById('txtSaveAgent');
+            const icon = document.getElementById('iconSaveAgent');
+
+            btn.disabled = true;
+            txt.textContent = "Güncelleniyor...";
+            icon.className = "fa-solid fa-circle-notch animate-spin";
+
+            try {
+                let avatarUrl = currentAgent.avatar_url;
+
+                // Yeni Profil resmi seçildiyse sıkıştır ve yükle
+                const fileInput = document.getElementById('inpAgentAvatar');
+                if (fileInput.files.length > 0) {
+                    const originalFile = fileInput.files[0];
+                    const compressedFile = await compressToWebP(originalFile);
+                    
+                    const fileName = `agents/${currentAgent.id}/${Date.now()}_avatar.webp`;
+
+                    const { error: uploadError } = await supabaseClient
+                        .storage
+                        .from('property-photos')
+                        .upload(fileName, compressedFile);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabaseClient
+                        .storage
+                        .from('property-photos')
+                        .getPublicUrl(fileName);
+
+                    avatarUrl = publicUrl;
+                }
+
+                // agents tablosunu güncelle
+                const { error: dbError } = await supabaseClient
+                    .from('agents')
+                    .update({
+                        name: document.getElementById('inpAgentName').value.trim(),
+                        phone: document.getElementById('inpAgentPhone').value.trim(),
+                        avatar_url: avatarUrl
+                    })
+                    .eq('id', currentAgent.id);
+
+                if (dbError) throw dbError;
+
+                alert("Profil bilgileriniz başarıyla güncellendi!");
+                window.location.reload();
+
+            } catch (err) {
+                alert("Profil güncellenirken hata oluştu: " + err.message);
+                btn.disabled = false;
+                txt.textContent = "Profil Bilgilerini Güncelle";
+                icon.className = "fa-solid fa-circle-check";
+            }
+        }
+
+        // 5. Şirket Ayarlarını Güncelleme Süreci
+        async function handleCompanyUpdate(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSaveCompany');
+            const txt = document.getElementById('txtSaveCompany');
+            const icon = document.getElementById('iconSaveCompany');
+
+            btn.disabled = true;
+            txt.textContent = "Kaydediliyor...";
+            icon.className = "fa-solid fa-circle-notch animate-spin";
+
+            try {
+                let logoUrl = "";
+
+                // Mevcut logo varsa koru
+                const { data: currentSettings } = await supabaseClient.from('settings').select('logo_url').eq('id', settingsId).single();
+                if (currentSettings) logoUrl = currentSettings.logo_url || "";
+
+                // Yeni logo seçildiyse sıkıştır ve yükle
+                const fileInput = document.getElementById('inpCompanyLogo');
+                if (fileInput.files.length > 0) {
+                    const originalFile = fileInput.files[0];
+                    const compressedFile = await compressToWebP(originalFile);
+                    
+                    const fileName = `settings/logo_${Date.now()}.webp`;
+
+                    const { error: uploadError } = await supabaseClient
+                        .storage
+                        .from('property-photos')
+                        .upload(fileName, compressedFile);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabaseClient
+                        .storage
+                        .from('property-photos')
+                        .getPublicUrl(fileName);
+
+                    logoUrl = publicUrl;
+                }
+
+                    // settings tablosunu guncelle (adres, koordinat ve link dâhil edildi)
+                    const { error: dbError } = await supabaseClient
+                        .from('settings')
+                        .update({
+                            company_name: document.getElementById('inpCompanyName').value.trim(),
+                            company_address: document.getElementById('inpCompanyAddress').value.trim(),
+                            map_coordinates: document.getElementById('inpCompanyCoords').value.trim(),
+                            map_link: document.getElementById('inpCompanyMapLink').value.trim(),
+                            logo_url: logoUrl
+                        })
+                        .eq('id', settingsId);
+
+                if (dbError) throw dbError;
+
+                alert("Şirket ve logo ayarları başarıyla kaydedildi!");
+                window.location.reload();
+
+            } catch (err) {
+                alert("Şirket ayarları güncellenirken hata oluştu: " + err.message);
+                btn.disabled = false;
+                txt.textContent = "Şirket Ayarlarını Kaydet";
+                icon.className = "fa-solid fa-cloud-arrow-up";
+            }
+        }
+
+        window.onload = checkSession;
+    </script>
+</body>
+</html>
