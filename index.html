@@ -38,11 +38,40 @@
             <div>
                 <h1 class="text-xl font-bold text-slate-950 tracking-tight">Aktif Portföyünüz</h1>
                 <p id="welcomeMessage" class="text-xs text-slate-500 mt-1 font-medium">Hoş geldiniz, ilanlarınızı buradan yönetebilirsiniz.</p>
+                    </div>
+            <!-- Tab Secenekleri (Aktifler mi Yoksa Arsiv mi?) -->
+            <div class="flex gap-2 mt-4">
+                <button type="button" onclick="switchView('active')" id="tabActiveListings" class="px-4 py-2 rounded-lg text-xs font-bold transition duration-150 bg-slate-900 text-white shadow-sm">
+                    Aktif İlanlar
+                </button>
+                <button type="button" onclick="switchView('archived')" id="tabArchivedListings" class="px-4 py-2 rounded-lg text-xs font-bold transition duration-150 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    Arşivlenmiş İlanlar
+                </button>
             </div>
+            <!-- Depolama Durumu Göstergesi (Widget) -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm my-6 max-w-md">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-hard-drive text-slate-400"></i> Depolama Alanı (Görseller)
+                    </span>
+                    <span id="lblStoragePercent" class="text-xs font-bold text-slate-900">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                    <div id="barStorage" class="bg-slate-900 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-semibold">
+                    <span id="lblStorageUsed">Hesaplanıyor...</span>
+                    <span>Limit: 1 GB (Ücretsiz)</span>
+                </div>
+            </div>
+
             <!-- Yeni İlan Ekle Butonu -->
             <a href="add.html" class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs tracking-wider uppercase transition shadow-sm">
                 <i class="fa-solid fa-plus text-sm"></i> Yeni İlan Ekle
             </a>
+<a href="profile.html" class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs tracking-wider uppercase transition shadow-sm">
+    <i class="fa-solid fa-user-gear"></i> Profil & Ayarlar
+</a>
         </div>
 
         <!-- İlanlar Tablosu / Listesi -->
@@ -105,8 +134,9 @@
             document.getElementById('userEmailLabel').textContent = session.user.email;
             document.getElementById('dashboardBody').classList.remove('hidden');
 
-            // Danışman kimliğini tespit et ve ilanları getir
+            // Danışman kimliğini tespit et, ilanları getir ve depolama alanını hesapla
             await getAgentIdentity(session.user.email);
+            await fetchStorageUsage();
         }
 
         // 2. Danışmanın e-postasını ID ile eşleştirme
@@ -133,17 +163,37 @@
             }
         }
 
-        // 3. Sadece bu danışmana ait ilanları getirme
+        let currentView = 'active'; // varsayilan olarak aktif ilanlar gosterilir
+
+        // Tab gecis fonksiyonu
+        function switchView(view) {
+            currentView = view;
+            const btnActive = document.getElementById('tabActiveListings');
+            const btnArchive = document.getElementById('tabArchivedListings');
+
+            if (view === 'active') {
+                btnActive.className = "px-4 py-2 rounded-lg text-xs font-bold transition duration-150 bg-slate-900 text-white shadow-sm";
+                btnArchive.className = "px-4 py-2 rounded-lg text-xs font-bold transition duration-150 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            } else {
+                btnArchive.className = "px-4 py-2 rounded-lg text-xs font-bold transition duration-150 bg-slate-900 text-white shadow-sm";
+                btnActive.className = "px-4 py-2 rounded-lg text-xs font-bold transition duration-150 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            }
+            fetchAgentListings();
+        }
+
+        // 3. İlanları Filtreye Gore Getirme
         async function fetchAgentListings() {
             document.getElementById('loadingState').classList.remove('hidden');
             document.getElementById('tableContainer').classList.add('hidden');
             document.getElementById('emptyState').classList.add('hidden');
 
             try {
+                // Sadece mevcut danismana ait ve secili duruma (active/archived) uyan ilanlari getir
                 const { data: listings, error } = await supabaseClient
                     .from('listings')
                     .select('*, images(image_url)')
-                    .eq('agent_id', currentAgentId);
+                    .eq('agent_id', currentAgentId)
+                    .eq('status', currentView);
 
                 if (error) throw error;
 
@@ -157,11 +207,42 @@
                 }
 
                 listings.forEach(listing => {
-                    const coverImage = (listing.images && listing.images.length > 0) 
-                        ? listing.images[0].image_url 
-                        : "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=120&q=80";
+                    // Kapak fotografi varsa tabloda onu goster, yoksa ilk resmi goster
+                    let coverImage = listing.cover_image_url;
+                    if (!coverImage && listing.images && listing.images.length > 0) {
+                        coverImage = listing.images[0].image_url;
+                    }
+                    if (!coverImage) {
+                        coverImage = "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=120&q=80";
+                    }
 
                     const formattedPrice = new Intl.NumberFormat('tr-TR').format(listing.price);
+
+                    // Aktif veya Arsiv durumuna gore buton tasarimi degisir
+                    let actionButtons = "";
+                    if (currentView === 'active') {
+                        actionButtons = `
+                            <a href="edit.html?id=${listing.id}" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition duration-150 flex items-center gap-1">
+                                <i class="fa-solid fa-pen-to-square"></i> Düzenle
+                            </a>
+                            <button onclick="archiveListing(${listing.id})" class="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg transition duration-150 flex items-center gap-1">
+                                <i class="fa-solid fa-box-archive"></i> Arşivle
+                            </button>
+                            <button onclick="deleteListing(${listing.id})" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-lg transition duration-150 flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can"></i> Sil
+                            </button>
+                        `;
+                    } else {
+                        // Arsivlenmis ilanlar icin sadece Kalici Silme butonu gosterilir
+                        actionButtons = `
+                                                        <a href="edit.html?id=${listing.id}" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition duration-150 flex items-center gap-1">
+                                <i class="fa-solid fa-rotate-left"></i> Düzenle & Etkinleştir
+                            </a>
+                            <button onclick="deleteListing(${listing.id})" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition duration-150 flex items-center gap-1 shadow-sm">
+                                <i class="fa-solid fa-trash-can"></i> Kalıcı Olarak Sil
+                            </button>
+                        `;
+                    }
 
                     const rowHtml = `
                         <tr class="hover:bg-slate-50 transition duration-150">
@@ -176,13 +257,7 @@
                             <td class="py-4 px-6 font-bold text-slate-900">${formattedPrice} ₺</td>
                             <td class="py-4 px-6">
                                 <div class="flex items-center justify-center gap-2">
-                                    <!-- Silme Butonu -->
-                                    <button onclick="deleteListing(${listing.id})" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-lg transition duration-150 flex items-center gap-1">
-                                        <i class="fa-solid fa-trash-can"></i> Sil
-                                    </button>
-                                    <a href="edit.html?id=${listing.id}" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition duration-150 flex items-center gap-1">
-        <i class="fa-solid fa-pen-to-square"></i> Düzenle
-    </a>
+                                    ${actionButtons}
                                 </div>
                             </td>
                         </tr>
@@ -229,7 +304,46 @@
                 alert("İlan silinemedi: " + error.message);
             }
         }
+// 4.1 İlanı Arşivleme ve Görsellerini Silerek Depolama Alanı Boşaltma Fonksiyonu
+async function archiveListing(id) {
+    const isConfirmed = confirm("Bu ilanı arşivlemek istediğinize emin misiniz? İlan yayından kaldırılacak ve tüm fotoğrafları silinerek depolama alanı boşaltılacaktır.");
+    if (!isConfirmed) return;
 
+    try {
+        // Adım 1: İlana ait tüm resimlerin yollarını al
+        const { data: images } = await supabaseClient.from('images').select('image_url').eq('listing_id', id);
+
+        // Adım 2: Resimleri fiziksel olarak Storage'dan silerek alan temizle
+        if (images && images.length > 0) {
+            const pathsToDelete = images.map(img => {
+                const parts = img.image_url.split('/property-photos/');
+                return parts.length > 1 ? parts[1] : null;
+            }).filter(Boolean);
+
+            if (pathsToDelete.length > 0) {
+                await supabaseClient.storage.from('property-photos').remove(pathsToDelete);
+            }
+        }
+
+        // Adim 3: images tablosundaki kayıtları sil
+        await supabaseClient.from('images').delete().eq('listing_id', id);
+
+        // Adim 4: listings tablosunda durumu 'archived' yap ve kapak resmini temizle
+        const { error: updateError } = await supabaseClient
+            .from('listings')
+            .update({ status: 'archived', cover_image_url: null })
+            .eq('id', id);
+
+        if (updateError) throw updateError;
+
+        alert("İlan başarıyla arşivlendi ve görseller silinerek yer açıldı!");
+        await fetchAgentListings();
+
+    } catch (error) {
+        console.error("Arşivleme hatası:", error.message);
+        alert("Hata oluştu: " + error.message);
+    }
+}
         // 5. Oturumu Kapatma (Logout)
         async function handleLogout() {
             try {
@@ -238,6 +352,38 @@
                 window.location.href = "login.html";
             } catch (error) {
                 console.error("Oturum kapatma hatası:", error.message);
+            }
+        }
+
+        // 6. Depolama Alani Durumunu Sorgulama Fonksiyonu
+        async function fetchStorageUsage() {
+            try {
+                // Supabase SQL view üzerinden toplam dosya boyutunu sorgula
+                const { data, error } = await supabaseClient
+                    .from('storage_usage')
+                    .select('*')
+                    .single();
+
+                if (error) throw error;
+
+                const totalBytes = data?.total_bytes || 0;
+                const limitBytes = 1024 * 1024 * 1024; // 1 GB byte cinsinden
+                
+                const usedMB = (totalBytes / (1024 * 1024)).toFixed(1);
+                const percent = Math.min(((totalBytes / limitBytes) * 100), 100).toFixed(1);
+
+                document.getElementById('lblStorageUsed').textContent = `${usedMB} MB kullanıldı`;
+                document.getElementById('lblStoragePercent').textContent = `${percent}%`;
+                document.getElementById('barStorage').style.width = `${percent}%`;
+
+                // Doluluk orani %85'i gecerse çubuğu kırmızı yapıp uyarı verir
+                if (parseFloat(percent) > 85) {
+                    document.getElementById('barStorage').className = "bg-rose-600 h-full transition-all duration-500";
+                }
+
+            } catch (err) {
+                console.error("Depolama sorgulama hatası:", err.message);
+                document.getElementById('lblStorageUsed').textContent = "Bilgi alınamadı";
             }
         }
 
